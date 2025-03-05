@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'config.php';
+require_once __DIR__ . '/config.php';
 
 // Authentication Functions
 function isLoggedIn() {
@@ -151,6 +151,55 @@ function getAllTags() {
     }
 }
 
+// Handle File Upload
+function handleFileUpload($file, $type = 'image') {
+    // Ensure upload directories exist with proper permissions
+    $uploads_dir = __DIR__ . '/uploads';
+    $html_files_dir = __DIR__ . '/html_files';
+    
+    if (!file_exists($uploads_dir)) {
+        mkdir($uploads_dir, 0777, true);
+    }
+    if (!file_exists($html_files_dir)) {
+        mkdir($html_files_dir, 0777, true);
+    }
+
+    $target_dir = $type === 'image' ? $uploads_dir . '/' : $html_files_dir . '/';
+    
+    $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
+    $new_filename = uniqid() . '.' . $file_extension;
+    $target_file = $target_dir . $new_filename;
+    $relative_path = ($type === 'image' ? 'uploads/' : 'html_files/') . $new_filename;
+    
+    // Check file type
+    if ($type === 'image') {
+        $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
+        if (!in_array($file_extension, $allowed_types)) {
+            return ['success' => false, 'message' => 'Only JPG, JPEG, PNG & GIF files are allowed.'];
+        }
+    } else {
+        if ($file_extension !== 'html') {
+            return ['success' => false, 'message' => 'Only HTML files are allowed.'];
+        }
+    }
+    
+    // Check file size (5MB max)
+    if ($file["size"] > 5000000) {
+        return ['success' => false, 'message' => 'File is too large. Maximum size is 5MB.'];
+    }
+    
+    if (move_uploaded_file($file["tmp_name"], $target_file)) {
+        if ($type === 'html') {
+            // For HTML files, return the URL that can be used to access the file
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
+            $relative_path = $protocol . $_SERVER['HTTP_HOST'] . '/' . $relative_path;
+        }
+        return ['success' => true, 'path' => $relative_path];
+    }
+    
+    return ['success' => false, 'message' => 'Error uploading file.'];
+}
+
 // Page Content Management Functions
 function getPageContent($page_name) {
     global $pdo;
@@ -183,46 +232,5 @@ function sanitizeOutput($text) {
 
 function displayMessage($message, $type = 'success') {
     return "<div class='alert alert-{$type} mb-4 p-4 rounded'>" . sanitizeOutput($message) . "</div>";
-}
-
-// Handle File Upload
-function handleFileUpload($file, $type = 'image') {
-    $target_dir = $type === 'image' ? "uploads/" : "html_files/";
-    if (!file_exists($target_dir)) {
-        mkdir($target_dir, 0777, true);
-    }
-    
-    $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
-    $new_filename = uniqid() . '.' . $file_extension;
-    $target_file = $target_dir . $new_filename;
-    
-    // Check file type
-    if ($type === 'image') {
-        $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
-        if (!in_array($file_extension, $allowed_types)) {
-            return ['success' => false, 'message' => 'Only JPG, JPEG, PNG & GIF files are allowed.'];
-        }
-    } else {
-        if ($file_extension !== 'html') {
-            return ['success' => false, 'message' => 'Only HTML files are allowed.'];
-        }
-    }
-    
-    // Check file size (5MB max)
-    if ($file["size"] > 5000000) {
-        return ['success' => false, 'message' => 'File is too large. Maximum size is 5MB.'];
-    }
-    
-    if (move_uploaded_file($file["tmp_name"], $target_file)) {
-        $path = $target_file;
-        if ($type === 'html') {
-            // For HTML files, return the URL that can be used to access the file
-            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
-            $path = $protocol . $_SERVER['HTTP_HOST'] . '/' . $target_file;
-        }
-        return ['success' => true, 'path' => $path];
-    }
-    
-    return ['success' => false, 'message' => 'Error uploading file.'];
 }
 ?>
