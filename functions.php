@@ -156,31 +156,53 @@ function handleFileUpload($file, $type = 'image') {
     // Ensure upload directories exist with proper permissions
     $uploads_dir = __DIR__ . '/uploads';
     $html_files_dir = __DIR__ . '/html_files';
+    $downloads_dir = __DIR__ . '/downloads';
     
-    if (!file_exists($uploads_dir)) {
-        mkdir($uploads_dir, 0777, true);
-    }
-    if (!file_exists($html_files_dir)) {
-        mkdir($html_files_dir, 0777, true);
+    foreach ([$uploads_dir, $html_files_dir, $downloads_dir] as $dir) {
+        if (!file_exists($dir)) {
+            mkdir($dir, 0777, true);
+        }
     }
 
-    $target_dir = $type === 'image' ? $uploads_dir . '/' : $html_files_dir . '/';
-    
+    // Create default thumbnail if it doesn't exist
+    $default_thumbnail = $uploads_dir . '/default-thumbnail.jpg';
+    if (!file_exists($default_thumbnail)) {
+        $img = imagecreatetruecolor(400, 300);
+        $bg = imagecolorallocate($img, 240, 240, 240);
+        $text_color = imagecolorallocate($img, 100, 100, 100);
+        imagefill($img, 0, 0, $bg);
+        imagestring($img, 5, 150, 140, "No Thumbnail", $text_color);
+        imagejpeg($img, $default_thumbnail);
+        imagedestroy($img);
+    }
+
+    // Determine target directory based on file type
+    switch ($type) {
+        case 'image':
+            $target_dir = $uploads_dir;
+            $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
+            break;
+        case 'html':
+            $target_dir = $html_files_dir;
+            $allowed_types = ['html'];
+            break;
+        case 'download':
+            $target_dir = $downloads_dir;
+            $allowed_types = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'zip', 'rar', 'txt'];
+            break;
+        default:
+            return ['success' => false, 'message' => 'Invalid file type.'];
+    }
+
     $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
     $new_filename = uniqid() . '.' . $file_extension;
-    $target_file = $target_dir . $new_filename;
-    $relative_path = ($type === 'image' ? 'uploads/' : 'html_files/') . $new_filename;
-    
+    $target_file = $target_dir . '/' . $new_filename;
+    $relative_path = basename($target_dir) . '/' . $new_filename;
+
     // Check file type
-    if ($type === 'image') {
-        $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
-        if (!in_array($file_extension, $allowed_types)) {
-            return ['success' => false, 'message' => 'Only JPG, JPEG, PNG & GIF files are allowed.'];
-        }
-    } else {
-        if ($file_extension !== 'html') {
-            return ['success' => false, 'message' => 'Only HTML files are allowed.'];
-        }
+    if (!in_array($file_extension, $allowed_types)) {
+        $allowed_list = implode(', ', $allowed_types);
+        return ['success' => false, 'message' => "Only {$allowed_list} files are allowed."];
     }
     
     // Check file size (5MB max)
