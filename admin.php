@@ -44,7 +44,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             
             if (empty($message)) {
-                if (addApp($_POST['name'], $uploadResult['path'], $link)) {
+                $is_downloadable = isset($_POST['is_downloadable']) ? 1 : 0;
+                $tags = !empty($_POST['tags']) ? trim($_POST['tags']) : '';
+                
+                if (addApp(
+                    $_POST['name'],
+                    $_POST['description'],
+                    $uploadResult['path'],
+                    $link,
+                    $is_downloadable,
+                    $tags
+                )) {
                     $message = 'App added successfully';
                 } else {
                     $message = 'Error adding app';
@@ -59,7 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     elseif ($_POST['action'] === 'update_app') {
         $data = [
             'name' => $_POST['name'],
+            'description' => $_POST['description'],
             'link' => $_POST['link'],
+            'is_downloadable' => isset($_POST['is_downloadable']) ? 1 : 0,
+            'tags' => !empty($_POST['tags']) ? trim($_POST['tags']) : '',
             'enabled' => isset($_POST['enabled']) ? 1 : 0
         ];
         
@@ -192,8 +205,22 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
                         <input type="text" name="name" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Description</label>
+                        <textarea name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                    </div>
+                    <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">Thumbnail</label>
                         <input type="file" name="thumbnail" required accept="image/*" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Tags (comma-separated)</label>
+                        <input type="text" name="tags" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g., School, Education, Math">
+                    </div>
+                    <div>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" name="is_downloadable" value="1" class="rounded">
+                            <span class="text-gray-700 text-sm font-bold">Enable Download</span>
+                        </label>
                     </div>
                     <div class="space-y-2">
                         <label class="block text-gray-700 text-sm font-bold">Link</label>
@@ -286,8 +313,22 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
                                     <input type="text" name="name" id="edit_name" required class="w-full px-3 py-2 border rounded-lg">
                                 </div>
                                 <div>
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Description</label>
+                                    <textarea name="description" id="edit_description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                                </div>
+                                <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2">New Thumbnail (optional)</label>
                                     <input type="file" name="thumbnail" accept="image/*" class="w-full">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Tags (comma-separated)</label>
+                                    <input type="text" name="tags" id="edit_tags" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g., School, Education, Math">
+                                </div>
+                                <div>
+                                    <label class="flex items-center space-x-2">
+                                        <input type="checkbox" name="is_downloadable" id="edit_downloadable" value="1" class="rounded">
+                                        <span class="text-gray-700 text-sm font-bold">Enable Download</span>
+                                    </label>
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-gray-700 text-sm font-bold">Link</label>
@@ -362,7 +403,10 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
     function editApp(app) {
         document.getElementById('edit_id').value = app.id;
         document.getElementById('edit_name').value = app.name;
+        document.getElementById('edit_description').value = app.description || '';
         document.getElementById('edit_link').value = app.link;
+        document.getElementById('edit_tags').value = app.tags || '';
+        document.getElementById('edit_downloadable').checked = app.is_downloadable == 1;
         document.getElementById('edit_enabled').checked = app.enabled == 1;
         document.getElementById('editModal').classList.remove('hidden');
     }
