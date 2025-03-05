@@ -54,11 +54,11 @@ function getApps($sort = null, $adminView = false) {
     }
 }
 
-function addApp($name, $thumbnail, $link) {
+function addApp($name, $description, $thumbnail, $link, $is_downloadable = 0, $tags = '') {
     global $pdo;
     try {
-        $stmt = $pdo->prepare("INSERT INTO apps (name, thumbnail, link) VALUES (?, ?, ?)");
-        return $stmt->execute([$name, $thumbnail, $link]);
+        $stmt = $pdo->prepare("INSERT INTO apps (name, description, thumbnail, link, is_downloadable, tags) VALUES (?, ?, ?, ?, ?, ?)");
+        return $stmt->execute([$name, $description, $thumbnail, $link, $is_downloadable, $tags]);
     } catch(PDOException $e) {
         error_log("Add app error: " . $e->getMessage());
         return false;
@@ -104,6 +104,50 @@ function incrementClickCount($id) {
     } catch(PDOException $e) {
         error_log("Increment click count error: " . $e->getMessage());
         return false;
+    }
+}
+
+function incrementDownloadCount($id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("UPDATE apps SET download_count = download_count + 1 WHERE id = ?");
+        return $stmt->execute([$id]);
+    } catch(PDOException $e) {
+        error_log("Increment download count error: " . $e->getMessage());
+        return false;
+    }
+}
+
+function getAppsByTag($tag) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM apps WHERE enabled = 1 AND tags LIKE ? ORDER BY created_at DESC");
+        $stmt->execute(['%' . $tag . '%']);
+        return $stmt->fetchAll();
+    } catch(PDOException $e) {
+        error_log("Get apps by tag error: " . $e->getMessage());
+        return [];
+    }
+}
+
+function getAllTags() {
+    global $pdo;
+    try {
+        $stmt = $pdo->query("SELECT DISTINCT tags FROM apps WHERE tags IS NOT NULL AND tags != ''");
+        $tags = [];
+        while ($row = $stmt->fetch()) {
+            $tagArray = explode(',', $row['tags']);
+            foreach ($tagArray as $tag) {
+                $tag = trim($tag);
+                if (!empty($tag) && !in_array($tag, $tags)) {
+                    $tags[] = $tag;
+                }
+            }
+        }
+        return $tags;
+    } catch(PDOException $e) {
+        error_log("Get all tags error: " . $e->getMessage());
+        return [];
     }
 }
 
