@@ -29,41 +29,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
     // Handle App Management
     if ($_POST['action'] === 'add_app') {
-        $uploadResult = handleFileUpload($_FILES['thumbnail']);
-        if ($uploadResult['success']) {
-            // Handle HTML file if uploaded along with the form
-            $link = $_POST['link'];
-            if (!empty($_FILES['html_file']['name'])) {
-                $htmlResult = handleFileUpload($_FILES['html_file'], 'html');
-                if ($htmlResult['success']) {
-                    $link = $htmlResult['path'];
-                } else {
-                    $message = $htmlResult['message'];
-                    $messageType = 'error';
-                }
+        $thumbnail_path = 'uploads/default-thumbnail.jpg'; // Default thumbnail
+        $link = $_POST['link'];
+        
+        // Handle thumbnail upload if provided
+        if (!empty($_FILES['thumbnail']['name'])) {
+            $uploadResult = handleFileUpload($_FILES['thumbnail'], 'image');
+            if ($uploadResult['success']) {
+                $thumbnail_path = $uploadResult['path'];
+            } else {
+                $message = $uploadResult['message'];
+                $messageType = 'error';
+            }
+        }
+        
+        // Handle app file upload if provided
+        if (empty($message) && !empty($_FILES['app_file']['name'])) {
+            $fileExt = strtolower(pathinfo($_FILES['app_file']['name'], PATHINFO_EXTENSION));
+            if ($fileExt === 'html') {
+                $fileResult = handleFileUpload($_FILES['app_file'], 'html');
+            } else {
+                $fileResult = handleFileUpload($_FILES['app_file'], 'download');
             }
             
-            if (empty($message)) {
-                $is_downloadable = isset($_POST['is_downloadable']) ? 1 : 0;
-                $tags = !empty($_POST['tags']) ? trim($_POST['tags']) : '';
-                
-                if (addApp(
-                    $_POST['name'],
-                    $_POST['description'],
-                    $uploadResult['path'],
-                    $link,
-                    $is_downloadable,
-                    $tags
-                )) {
-                    $message = 'App added successfully';
-                } else {
-                    $message = 'Error adding app';
-                    $messageType = 'error';
-                }
+            if ($fileResult['success']) {
+                $link = $fileResult['path'];
+                $is_downloadable = ($fileExt !== 'html') ? 1 : 0;
+            } else {
+                $message = $fileResult['message'];
+                $messageType = 'error';
             }
-        } else {
-            $message = $uploadResult['message'];
-            $messageType = 'error';
+        }
+        
+        if (empty($message)) {
+            $is_downloadable = isset($is_downloadable) ? $is_downloadable : 0;
+            $tags = !empty($_POST['tags']) ? trim($_POST['tags']) : '';
+            
+            if (addApp(
+                $_POST['name'],
+                $_POST['description'],
+                $thumbnail_path,
+                $link,
+                $is_downloadable,
+                $tags
+            )) {
+                $message = 'App added successfully';
+            } else {
+                $message = 'Error adding app';
+                $messageType = 'error';
+            }
         }
     }
     elseif ($_POST['action'] === 'update_app') {
@@ -209,8 +223,13 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
                         <textarea name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
                     </div>
                     <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Thumbnail</label>
-                        <input type="file" name="thumbnail" required accept="image/*" class="w-full">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Thumbnail (optional)</label>
+                        <input type="file" name="thumbnail" accept="image/*" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Upload File (HTML or other formats)</label>
+                        <input type="file" name="app_file" class="w-full">
+                        <p class="text-sm text-gray-500 mt-1">HTML files will be displayed in browser, other formats will be downloadable</p>
                     </div>
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">Tags (comma-separated)</label>
