@@ -142,8 +142,8 @@ function displayMessage($message, $type = 'success') {
 }
 
 // Handle File Upload
-function handleFileUpload($file) {
-    $target_dir = "uploads/";
+function handleFileUpload($file, $type = 'image') {
+    $target_dir = $type === 'image' ? "uploads/" : "html_files/";
     if (!file_exists($target_dir)) {
         mkdir($target_dir, 0777, true);
     }
@@ -153,9 +153,15 @@ function handleFileUpload($file) {
     $target_file = $target_dir . $new_filename;
     
     // Check file type
-    $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
-    if (!in_array($file_extension, $allowed_types)) {
-        return ['success' => false, 'message' => 'Only JPG, JPEG, PNG & GIF files are allowed.'];
+    if ($type === 'image') {
+        $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
+        if (!in_array($file_extension, $allowed_types)) {
+            return ['success' => false, 'message' => 'Only JPG, JPEG, PNG & GIF files are allowed.'];
+        }
+    } else {
+        if ($file_extension !== 'html') {
+            return ['success' => false, 'message' => 'Only HTML files are allowed.'];
+        }
     }
     
     // Check file size (5MB max)
@@ -164,7 +170,13 @@ function handleFileUpload($file) {
     }
     
     if (move_uploaded_file($file["tmp_name"], $target_file)) {
-        return ['success' => true, 'path' => $target_file];
+        $path = $target_file;
+        if ($type === 'html') {
+            // For HTML files, return the URL that can be used to access the file
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
+            $path = $protocol . $_SERVER['HTTP_HOST'] . '/' . $target_file;
+        }
+        return ['success' => true, 'path' => $path];
     }
     
     return ['success' => false, 'message' => 'Error uploading file.'];
