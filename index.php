@@ -72,6 +72,7 @@ $apps = !empty($tag) ? getAppsByTag($tag) : getApps();
             border-radius: 50%;
             cursor: pointer;
             transition: all 0.3s ease;
+            z-index: 10;
         }
         .download-icon:hover {
             transform: scale(1.1);
@@ -186,11 +187,13 @@ $apps = !empty($tag) ? getAppsByTag($tag) : getApps();
                         </div>
                     </div>
 
+                    <?php if (!$app['is_downloadable']): ?>
                     <a href="<?= sanitizeOutput($app['link']) ?>" 
                        onclick="incrementClickCount(<?= $app['id'] ?>)"
                        class="block text-center mt-3 py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
                         Access Now
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -245,10 +248,35 @@ $apps = !empty($tag) ? getAppsByTag($tag) : getApps();
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.download_url) {
-                    window.location.href = data.download_url;
+                if (data.success) {
+                    if (data.needsConfirmation) {
+                        if (confirm(data.message)) {
+                            // User confirmed, proceed with download
+                            fetch('download_counter.php', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                },
+                                body: 'app_id=' + encodeURIComponent(appId) + '&confirm=true'
+                            })
+                            .then(response => response.json())
+                            .then(downloadData => {
+                                if (downloadData.success && downloadData.download_url) {
+                                    window.location.href = downloadData.download_url;
+                                } else {
+                                    alert('Download failed. Please try again.');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('Download failed. Please try again.');
+                            });
+                        }
+                    } else if (data.download_url) {
+                        window.location.href = data.download_url;
+                    }
                 } else {
-                    alert('Download failed. Please try again.');
+                    alert(data.message || 'Download failed. Please try again.');
                 }
             })
             .catch(error => {
