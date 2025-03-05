@@ -27,9 +27,13 @@ $queries = [
     "CREATE TABLE IF NOT EXISTS apps (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
+        description TEXT,
         thumbnail VARCHAR(255) NOT NULL,
         link VARCHAR(255) NOT NULL,
         click_count INT DEFAULT 0,
+        download_count INT DEFAULT 0,
+        is_downloadable TINYINT(1) DEFAULT 0,
+        tags VARCHAR(255),
         enabled TINYINT(1) DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
