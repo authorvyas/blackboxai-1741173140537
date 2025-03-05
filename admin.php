@@ -1,5 +1,5 @@
 <?php
-require_once 'functions.php';
+require_once __DIR__ . '/functions.php';
 
 $message = '';
 $messageType = 'success';
@@ -19,15 +19,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Require admin authentication for other actions
     requireAdmin();
     
+    // Handle HTML file upload
+    if ($_POST['action'] === 'upload_html') {
+        $uploadResult = handleFileUpload($_FILES['html_file'], 'html');
+        header('Content-Type: application/json');
+        echo json_encode($uploadResult);
+        exit;
+    }
+    
     // Handle App Management
     if ($_POST['action'] === 'add_app') {
         $uploadResult = handleFileUpload($_FILES['thumbnail']);
         if ($uploadResult['success']) {
-            if (addApp($_POST['name'], $uploadResult['path'], $_POST['link'])) {
-                $message = 'App added successfully';
-            } else {
-                $message = 'Error adding app';
-                $messageType = 'error';
+            // Handle HTML file if uploaded along with the form
+            $link = $_POST['link'];
+            if (!empty($_FILES['html_file']['name'])) {
+                $htmlResult = handleFileUpload($_FILES['html_file'], 'html');
+                if ($htmlResult['success']) {
+                    $link = $htmlResult['path'];
+                } else {
+                    $message = $htmlResult['message'];
+                    $messageType = 'error';
+                }
+            }
+            
+            if (empty($message)) {
+                if (addApp($_POST['name'], $uploadResult['path'], $link)) {
+                    $message = 'App added successfully';
+                } else {
+                    $message = 'Error adding app';
+                    $messageType = 'error';
+                }
             }
         } else {
             $message = $uploadResult['message'];
@@ -41,12 +63,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'enabled' => isset($_POST['enabled']) ? 1 : 0
         ];
         
+        // Handle thumbnail upload if provided
         if (!empty($_FILES['thumbnail']['name'])) {
             $uploadResult = handleFileUpload($_FILES['thumbnail']);
             if ($uploadResult['success']) {
                 $data['thumbnail'] = $uploadResult['path'];
             } else {
                 $message = $uploadResult['message'];
+                $messageType = 'error';
+            }
+        }
+        
+        // Handle HTML file upload if provided
+        if (empty($message) && !empty($_FILES['html_file']['name'])) {
+            $htmlResult = handleFileUpload($_FILES['html_file'], 'html');
+            if ($htmlResult['success']) {
+                $data['link'] = $htmlResult['path'];
+            } else {
+                $message = $htmlResult['message'];
                 $messageType = 'error';
             }
         }
@@ -161,9 +195,17 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
                         <label class="block text-gray-700 text-sm font-bold mb-2">Thumbnail</label>
                         <input type="file" name="thumbnail" required accept="image/*" class="w-full">
                     </div>
-                    <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Link</label>
-                        <input type="url" name="link" required class="w-full px-3 py-2 border rounded-lg">
+                    <div class="space-y-2">
+                        <label class="block text-gray-700 text-sm font-bold">Link</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="url" name="link" id="link_input" class="w-full px-3 py-2 border rounded-lg">
+                            <span class="text-gray-500">or</span>
+                            <label class="bg-gray-100 px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-200">
+                                <input type="file" name="html_file" accept=".html" class="hidden" onchange="handleHTMLUpload(this)">
+                                Upload HTML
+                            </label>
+                        </div>
+                        <p class="text-sm text-gray-500">Enter a URL or upload an HTML file</p>
                     </div>
                     <button type="submit" class="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors">
                         Add App
@@ -247,9 +289,17 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
                                     <label class="block text-gray-700 text-sm font-bold mb-2">New Thumbnail (optional)</label>
                                     <input type="file" name="thumbnail" accept="image/*" class="w-full">
                                 </div>
-                                <div>
-                                    <label class="block text-gray-700 text-sm font-bold mb-2">Link</label>
-                                    <input type="url" name="link" id="edit_link" required class="w-full px-3 py-2 border rounded-lg">
+                                <div class="space-y-2">
+                                    <label class="block text-gray-700 text-sm font-bold">Link</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="url" name="link" id="edit_link" class="w-full px-3 py-2 border rounded-lg">
+                                        <span class="text-gray-500">or</span>
+                                        <label class="bg-gray-100 px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-200">
+                                            <input type="file" name="html_file" accept=".html" class="hidden" onchange="handleEditHTMLUpload(this)">
+                                            Upload HTML
+                                        </label>
+                                    </div>
+                                    <p class="text-sm text-gray-500">Enter a URL or upload an HTML file</p>
                                 </div>
                                 <div>
                                     <label class="flex items-center">
@@ -319,6 +369,39 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : null;
 
     function closeEditModal() {
         document.getElementById('editModal').classList.add('hidden');
+    }
+
+    function handleHTMLUpload(input) {
+        handleFileUpload(input, 'link_input');
+    }
+
+    function handleEditHTMLUpload(input) {
+        handleFileUpload(input, 'edit_link');
+    }
+
+    function handleFileUpload(input, targetInputId) {
+        if (input.files && input.files[0]) {
+            const formData = new FormData();
+            formData.append('html_file', input.files[0]);
+            formData.append('action', 'upload_html');
+
+            fetch('admin.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById(targetInputId).value = data.path;
+                } else {
+                    alert(data.message || 'Error uploading HTML file');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error uploading HTML file');
+            });
+        }
     }
     </script>
 </body>
